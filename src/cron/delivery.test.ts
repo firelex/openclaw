@@ -55,6 +55,43 @@ describe("resolveCronDeliveryPlan", () => {
     expect(plan.to).toBe("https://example.invalid/cron");
   });
 
+  it("derives accountId from job.agentId for payload-sourced plans", () => {
+    const plan = resolveCronDeliveryPlan(
+      makeJob({
+        agentId: "mike-lawley",
+        delivery: undefined,
+        payload: {
+          kind: "agentTurn",
+          message: "hello",
+          deliver: true,
+          channel: "matrix",
+          to: "room:!abc:example.com",
+        },
+      }),
+    );
+    expect(plan.mode).toBe("announce");
+    expect(plan.source).toBe("payload");
+    expect(plan.accountId).toBe("mike-lawley");
+  });
+
+  it("does not set accountId when job has no agentId (payload source)", () => {
+    const plan = resolveCronDeliveryPlan(
+      makeJob({
+        agentId: undefined,
+        delivery: undefined,
+        payload: {
+          kind: "agentTurn",
+          message: "hello",
+          deliver: true,
+          channel: "matrix",
+          to: "room:!abc:example.com",
+        },
+      }),
+    );
+    expect(plan.source).toBe("payload");
+    expect(plan.accountId).toBeUndefined();
+  });
+
   it("threads delivery.accountId when explicitly configured", () => {
     const plan = resolveCronDeliveryPlan(
       makeJob({

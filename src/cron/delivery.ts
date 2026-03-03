@@ -82,10 +82,18 @@ export function resolveCronDeliveryPlan(job: CronJob): CronDeliveryPlan {
   const hasExplicitTarget = Boolean(to);
   const requested = legacyMode === "explicit" || (legacyMode === "auto" && hasExplicitTarget);
 
+  // For hook-dispatched jobs (payload source), derive accountId from the
+  // job's agentId.  In multi-account channel setups (e.g. Matrix) the agent
+  // slug doubles as the account identifier, so this ensures the delivery
+  // targets the correct bot user rather than falling back to the first
+  // registered account.
+  const payloadAccountId = normalizeAccountId(job.agentId);
+
   return {
     mode: requested ? "announce" : "none",
     channel,
     to,
+    accountId: payloadAccountId,
     source: "payload",
     requested,
   };
