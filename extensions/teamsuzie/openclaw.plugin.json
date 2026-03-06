@@ -1,0 +1,9 @@
+{
+  "id": "teamsuzie",
+  "channels": ["teamsuzie"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
