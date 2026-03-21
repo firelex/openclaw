@@ -30,10 +30,11 @@ export type MonitorOpts = {
   core: PluginRuntime;
   accountId: string;
   abortSignal?: AbortSignal;
+  setStatus?: (next: Record<string, unknown>) => void;
 };
 
 export async function startAccountMonitor(opts: MonitorOpts): Promise<void> {
-  const { core, accountId, abortSignal } = opts;
+  const { core, accountId, abortSignal, setStatus } = opts;
   const logger = core.logging.getChildLogger({ module: `teamsuzie:${accountId}` });
 
   let attempt = 0;
@@ -42,7 +43,7 @@ export async function startAccountMonitor(opts: MonitorOpts): Promise<void> {
     try {
       attempt++;
       logger.info(`teamsuzie: starting monitor for ${accountId} (attempt ${attempt})`);
-      await runMonitor({ core, accountId, logger, abortSignal });
+      await runMonitor({ core, accountId, logger, abortSignal, setStatus });
       // If runMonitor completes normally (abort), we're done
       return;
     } catch (err) {
@@ -82,8 +83,9 @@ async function runMonitor(params: {
   accountId: string;
   logger: RuntimeLogger;
   abortSignal?: AbortSignal;
+  setStatus?: (next: Record<string, unknown>) => void;
 }): Promise<void> {
-  const { core, accountId, logger, abortSignal } = params;
+  const { core, accountId, logger, abortSignal, setStatus } = params;
   const cfg = core.config.loadConfig() as CoreConfig;
 
   // Log bindings for debugging routing
@@ -124,10 +126,14 @@ async function runMonitor(params: {
   // Track last event time for watchdog
   let lastEventAt = Date.now();
   let messagesHandled = 0;
+  const pushEventStatus = (at: number) => {
+    setStatus?.({ lastEventAt: at, lastInboundAt: at });
+  };
 
   // Register event listener
   client.on("room.message", async (roomId: string, event: Record<string, unknown>) => {
     lastEventAt = Date.now();
+    pushEventStatus(lastEventAt);
     messagesHandled++;
 
     // Send read receipt (fire and forget)
@@ -144,10 +150,12 @@ async function runMonitor(params: {
   // Also track non-message events for watchdog liveness
   client.on("room.event", () => {
     lastEventAt = Date.now();
+    pushEventStatus(lastEventAt);
   });
 
   // Start the sync loop
   await client.start();
+  setStatus?.({ connected: true, lastEventAt });
   logger.info(`teamsuzie: logged in as ${selfUserId}`, { accountId, homeserver });
 
   // Reset attempt counter on successful connection
@@ -195,6 +203,7 @@ async function runMonitor(params: {
 
       const onAbort = () => {
         cleanup();
+        setStatus?.({ connected: false });
         try {
           client.stop();
         } catch {
@@ -216,6 +225,7 @@ async function runMonitor(params: {
   } finally {
     clearInterval(heartbeatInterval);
     clearInterval(watchdogInterval);
+    setStatus?.({ connected: false });
   }
 }
 

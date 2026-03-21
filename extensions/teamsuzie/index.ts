@@ -185,6 +185,7 @@ const teamsuziePlugin: ChannelPlugin<ResolvedTeamSuzieAccount> = {
         core,
         accountId: account.accountId,
         abortSignal: ctx.abortSignal,
+        setStatus: ctx.setStatus,
       });
     },
   },
